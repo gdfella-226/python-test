@@ -3,10 +3,14 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from .models import User, Message
 from .serializers import UserSerializer, MessageSerializer
+from .forms import LoginForm, CheckLoginForm, GetMessagesForm, SendMessageForm
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
+from django.shortcuts import render, redirect
+from django.urls import reverse
 import random
 import string
+# from tg_core import VIRTUAL_CLIENT
 
 class LoginView(APIView):
     @swagger_auto_schema(
@@ -19,13 +23,20 @@ class LoginView(APIView):
         responses={200: openapi.Response('QR Link', UserSerializer)}
     )
     def post(self, request):
-        phone = request.data.get('phone')
-        if not phone:
-            return Response({'error': 'Phone number is required'}, status=status.HTTP_400_BAD_REQUEST)
+        form = LoginForm(request.POST)
+        if form.is_valid():
+            phone = form.cleaned_data['phone']
+            user, created = User.objects.get_or_create(phone=phone)
+            qr_link_url = 'https://example.com/qr/' + ''.join(
+                random.choices(string.ascii_letters + string.digits, k=10))
+            return render(request, 'login.html', {'form': form, 'qr_link_url': qr_link_url})
+        else:
+            form = LoginForm()
+        return render(request, 'login.html', {'form': form})
 
-        user, created = User.objects.get_or_create(phone=phone)
-        qr_link_url = 'https://example.com/qr/' + ''.join(random.choices(string.ascii_letters + string.digits, k=10))
-        return Response({'qr_link_url': qr_link_url})
+    def get(self, request):
+        form = CheckLoginForm()
+        return render(request, 'login.html', {'form': form, 'status': status})
 
 
 class CheckLoginView(APIView):
@@ -36,15 +47,19 @@ class CheckLoginView(APIView):
         responses={200: openapi.Response('Status', UserSerializer)}
     )
     def get(self, request):
-        phone = request.query_params.get('phone')
-        if not phone:
-            return Response({'error': 'Phone number is required'}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            user = User.objects.get(phone=phone)
-            return Response({'status': user.status})
-        except User.DoesNotExist:
-            return Response({'status': 'error'})
+        status = None
+        if request.method == 'GET' and 'phone' in request.GET:
+            form = CheckLoginForm(request.GET)
+            if form.is_valid():
+                phone = form.cleaned_data['phone']
+                try:
+                    user = User.objects.get(phone=phone)
+                    status = user.status
+                except User.DoesNotExist:
+                    status = 'error'
+        else:
+            form = CheckLoginForm()
+        return render(request, 'check_login.html', {'form': form, 'status': status})
 
 
 class GetMessagesView(APIView):
@@ -56,18 +71,23 @@ class GetMessagesView(APIView):
         responses={200: openapi.Response('Messages', MessageSerializer(many=True))}
     )
     def get(self, request):
-        phone = request.query_params.get('phone')
-        uname = request.query_params.get('uname')
-        if not phone or not uname:
-            return Response({'error': 'Phone number and username are required'}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            user = User.objects.get(phone=phone)
-            messages = user.messages.filter(username=uname).order_by('-created_at')[:50]
-            serializer = MessageSerializer(messages, many=True)
-            return Response({'messages': serializer.data})
-        except User.DoesNotExist:
-            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+        messages = None
+        if request.method == 'GET' and 'phone' in request.GET and 'uname' in request.GET:
+            form = GetMessagesForm(request.GET)
+            if form.is_valid():
+                phone = form.cleaned_data['phone']
+                uname = form.cleaned_data['uname']
+                try:
+                    user = User.objects.get(phone=phone)
+                    for msg in external_messages:
+                        Message.objects.create(user=user, username=msg['username'], message_text=msg['message_text'],
+                                               is_self=msg['is_self'])
+                    messages = user.messages.filter(username=uname).order_by('-created_at')[:50]
+                except User.DoesNotExist:
+                    messages = []
+        else:
+            form = GetMessagesForm()
+        return render(request, 'messages.html', {'form': form, 'messages': messages})
 
 
 class SendMessageView(APIView):
@@ -83,15 +103,23 @@ class SendMessageView(APIView):
         responses={200: openapi.Response('Status', UserSerializer)}
     )
     def post(self, request):
-        message_text = request.data.get('message_text')
-        from_phone = request.data.get('from_phone')
-        username = request.data.get('username')
-        if not message_text or not from_phone or not username:
-            return Response({'error': 'All fields are required'}, status=status.HTTP_400_BAD_REQUEST)
+        status = None
+        if request.method == 'POST':
+            form = SendMessageForm(request.POST)
+            if form.is_valid():
+                message_text = form.cleaned_data['message_text']
+                from_phone = form.cleaned_data['from_phone']
+                username = form.cleaned_data['username']
+                try:
+                    user = User.objects.get(phone=from_phone)
+                    Message.objects.create(user=user, username=username, message_text=message_text, is_self=True)
+                    status = 'ok'
+                except User.DoesNotExist:
+                    status = 'error'
+        else:
+            form = SendMessageForm()
+        return render(request, 'send_message.html', {'form': form, 'status': status})
 
-        try:
-            user = User.objects.get(phone=from_phone)
-            Message.objects.create(user=user, username=username, message_text=message_text, is_self=True)
-            return Response({'status': 'ok'})
-        except User.DoesNotExist:
-            return Response({'status': 'error', 'message': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+    def get(self, request):
+        form = CheckLoginForm()
+        return render(request, 'send_message.html', {'form': form, 'status': status})

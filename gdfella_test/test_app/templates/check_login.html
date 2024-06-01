@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Check Login Status</title>
+</head>
+<body>
+    <h1>Check Login Status</h1>
+    <form method="GET" action="{% url 'check-login' %}">
+        <label for="phone">Phone:</label>
+        <input type="text" id="phone" name="phone" required>
+        <button type="submit">Check Status</button>
+    </form>
+    {% if status %}
+        <p>Status: {{ status }}</p>
+    {% endif %}
+</body>
+</html>

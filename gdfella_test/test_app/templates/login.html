@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Login</title>
+</head>
+<body>
+    <h1>Login</h1>
+    <form method="POST" action="{% url 'login' %}">
+        {% csrf_token %}
+        <label for="phone">Phone:</label>
+        <input type="text" id="phone" name="phone" required>
+        <button type="submit">Login</button>
+    </form>
+</body>
+</html>

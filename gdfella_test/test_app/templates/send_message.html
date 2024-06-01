@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Send Message</title>
+</head>
+<body>
+    <h1>Send Message</h1>
+    <form method="POST" action="{% url 'send-message' %}">
+        {% csrf_token %}
+        <label for="message_text">Message:</label>
+        <input type="text" id="message_text" name="message_text" required>
+        <label for="from_phone">From Phone:</label>
+        <input type="text" id="from_phone" name="from_phone" required>
+        <label for="username">Username:</label>
+        <input type="text" id="username" name="username" required>
+        <button type="submit">Send</button>
+    </form>
+    {% if status %}
+        <p>Status: {{ status }}</p>
+    {% endif %}
+</body>
+</html>

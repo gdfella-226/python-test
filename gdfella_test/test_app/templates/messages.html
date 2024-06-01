@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Messages</title>
+</head>
+<body>
+    <h1>Messages</h1>
+    <form method="GET" action="{% url 'get-messages' %}">
+        <label for="phone">Phone:</label>
+        <input type="text" id="phone" name="phone" required>
+        <label for="uname">Username:</label>
+        <input type="text" id="uname" name="uname" required>
+        <button type="submit">Get Messages</button>
+    </form>
+    {% if messages %}
+        <ul>
+        {% for message in messages %}
+            <li><strong>{{ message.username }}</strong>: {{ message.message_text }} ({{ message.is_self|yesno:"self,other" }})</li>
+        {% endfor %}
+        </ul>
+    {% endif %}
+</body>
+</html>
